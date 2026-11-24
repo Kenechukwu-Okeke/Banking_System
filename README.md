@@ -47,7 +47,7 @@ A complete banking system with REST API backend and modern React frontend, built
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/swissmarley/banking-system.git
+git clone https://github.com/Kenechukwu-Okeke/Banking_System.git
 cd banking-system
 ```
 
