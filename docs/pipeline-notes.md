@@ -91,3 +91,90 @@ yeah , i will added Status checks after, i removed it now because i removed the 
 ```
 
 Note: spelling preserved. This is the reason the documentation should give for the sequencing: a required check that no workflow reports leaves every pull request stuck at "Expected", so the requirement goes on only after the replacement workflow exists and has completed a run.
+
+### Entry 5 — 2026-11-24 12:04 WAT — Pre-commit hooks with Husky and Gitleaks
+
+Source: chat message, including commands and config files intended for the repo
+
+Next up Advanced Technique: Set Up Pre-Commit Hooks with Husky and Gitleaks
+
+Before code ever hits GitHub, i can catch issues locally with Git hooks. Using Husky to manage the hook and Gitleaks to scan for secrets, you can:
+
+- Block API keys, passwords, and private keys from being committed
+- Share the same hook with every teammate automatically via npm install
+- Back it up with a CI check so the hook can't be bypassed
+
+```bash
+# Install Husky at the repo root (banking-system/)
+npm install --save-dev husky
+npx husky init
+
+# Install Gitleaks locally (one-time, per developer)
+# macOS:   brew install gitleaks
+# Windows: winget install gitleaks
+# Linux:   download from https://github.com/gitleaks/gitleaks/releases
+```
+
+Then replace the contents of .husky/pre-commit so it scans staged files and blocks the commit if anything is found:
+
+```sh
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "✖ gitleaks is not installed. See SETUP.md (Prerequisites)."
+  exit 1
+fi
+
+gitleaks git --pre-commit --staged --redact -v || exit 1
+```
+
+Add a .gitleaks.toml at the root to allowlist known false positives:
+
+```toml
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  '''\.env\.example$''',
+
+  '''package-lock\.json$''',
+]
+```
+
+Finally, enforce the same check on the server so git commit --no-verify can't skip it. Create .github/workflows/gitleaks.yml:
+
+```yaml
+name: gitleaks
+on: [pull_request, push]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+```
+(For Deep seek: I have added Require status checks to pass before merging in the ruleset.)
+```
+
+Note: the parenthetical is a status change, not description of the hook work. It supersedes the deferral recorded in Entry 4: status checks are now enabled on the ruleset.
+
+### Entry 6 — 2026-11-24 12:10 WAT — Publishing platform
+
+Source: chat message
+
+```
+For Deepseek: The platform i am going to publiish the documentation is Hashnode. SO have that in mind
+```
+
+Note: spelling preserved. The documentation is to be published on Hashnode, which constrains the output:
+
+- Markdown, GitHub-flavoured, with language-tagged code fences; no MDX components or raw HTML widgets.
+- Images must resolve from a public URL. Relative repo paths such as `docs/assets/01-ruleset-definition.webp` will not render; the files are kept here as the source, but each needs to be uploaded through Hashnode's uploader (or served from a public host) when the post is assembled. Cover images must come from Hashnode's CDN.
+- Tables and headings are supported, and headings drive Hashnode's generated table of contents.
+- The outline has thirteen sections; whether it ships as one long post or a Hashnode series is still open.
