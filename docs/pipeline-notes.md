@@ -178,3 +178,119 @@ Note: spelling preserved. The documentation is to be published on Hashnode, whic
 - Images must resolve from a public URL. Relative repo paths such as `docs/assets/01-ruleset-definition.webp` will not render; the files are kept here as the source, but each needs to be uploaded through Hashnode's uploader (or served from a public host) when the post is assembled. Cover images must come from Hashnode's CDN.
 - Tables and headings are supported, and headings drive Hashnode's generated table of contents.
 - The outline has thirteen sections; whether it ships as one long post or a Hashnode series is still open.
+
+### Entry 7 — 2026-11-24 15:09 WAT — First commit through the hook
+
+Source: chat message with one screenshot
+
+```
+This is me using Gitleak to commit the recent changes and it made
+```
+
+Screenshot saved as `docs/assets/04-precommit-hook.webp`.
+
+Observed in the screenshot:
+
+- Command run from the repo root on branch `Devops`: `git commit -m "added .gitleaks.toml and  gitleaks.yml"`.
+- Gitleaks printed its banner, then `1 commits scanned.`, `scan completed in 99.4ms`, `no leaks found`.
+- The commit then completed: `[Devops e636de0] added .gitleaks.toml and  gitleaks.yml`, with 6 files changed, 2777 insertions(+), 1 deletion(-).
+- Files created in that commit: `.github/workflows/gitleaks.yml`, `.gitleaks.toml`, `.husky/pre-commit`, `package-lock.json`.
+
+Note: this shows the hook running before the commit object exists and a clean scan letting it through. The documentation should pair it with a blocked commit containing a fake secret, so the reader sees both outcomes.
+
+### Entry 8 — 2026-11-24 15:13 WAT — Blocked commit with a demo secret
+
+Source: chat message with one screenshot
+
+```
+This is me testing Gitleaks by trying to commit a file with a demo aws access token and git leaks didn't allow the commit to go through.
+```
+
+Screenshot saved as `docs/assets/05-precommit-blocked.webp`.
+
+Observed in the screenshot:
+
+- Commands: `echo 'AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE' > gitleaks-test.txt`, then `git add gitleaks-test.txt`, then `git commit -m "test gitleaks detection"`.
+- Gitleaks reported the finding with `Secret: REDACTED`, `RuleID: aws-access-token`, `Entropy: 3.684184`, `File: gitleaks-test.txt`, `Line: 1`, `Fingerprint: gitleaks-test.txt:aws-access-token:1`.
+- Summary lines: `1 commits scanned.`, `scan completed in 83ms`, `WRN leaks found: 1`.
+- The commit was abandoned: `husky - pre-commit script failed (code 1)`, and the shell returned to the prompt with no commit created.
+
+Note: together with Entry 7 this gives both outcomes — a clean scan committing in 99.4ms, and a leak rejected in 83ms. The `--redact` flag is what turns the secret into `REDACTED` in the finding, which matters because terminal and CI logs are retained.
+
+Note: the test file `gitleaks-test.txt` appears to remain staged after the rejection; the documentation should tell the reader to remove it (`git rm --cached gitleaks-test.txt` or `git reset gitleaks-test.txt && rm gitleaks-test.txt`) so the demo does not pollute the next commit.
+
+### Entry 9 — 2026-11-24 15:16 WAT — Why Gitleaks also runs in CI
+
+Source: chat message
+
+```
+I added the gitleaks as a pipeline also because of these limitations:
+
+there are limitations:
+- A developer can bypass the hook using git commit --no-verify.
+- A developer might forget to install Gitleaks.
+- Someone could push code without using your configured local hook.
+- Other contributors might not follow the same setup instructions.
+
+It acts as an independent security check on GitHub regardless whether the developer installs gitleaks or forces a push and so on to by pass these limitations
+```
+
+Note: spelling preserved. This is the justification for the `gitleaks.yml` workflow and belongs in the same section as the hook: the hook is advisory because it lives on the developer's machine, the workflow is enforcement because it runs on GitHub and its result is a required status check.
+
+### Entry 10 — 2026-11-24 15:46 WAT — CI pipeline
+
+Source: chat message
+
+```
+I have set up this CI PIpeline:
+
+name: CI Pipeline
+on:
+  push:
+    branches:
+      - main
+      - devops
+  pull_request:
+    branches:
+      - main
+      - devops
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24'
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+      - name: Install dependencies and run tests
+        run: |
+          npm ci
+          npm test
+          npm run lint
+
+
+
+
+to puah to the devops and main branch
+```
+
+Note: spelling preserved, including "PIpeline" and "puah". The workflow triggers on pushes and pull requests targeting `main` and `devops`; the single job is named `build`, so the resulting status check is `build`.
+
+Note: the steps as written do not match the repository. The root `package.json` has no `test` and no `lint` script, so `npm test` and `npm run lint` fail with "Missing script". `npm ci` at the root installs only the root dependencies; the backend and frontend have their own manifests, and neither is built or exercised by this job. The documentation must either add those scripts or replace the step with checks that exist, otherwise the workflow cannot go green and a required `build` check would block every pull request.
+
+### Entry 11 — 2026-11-24 15:47 WAT — Dependency caching
+
+Source: chat message
+
+```
+i added Cache your dependencies to increase speed and reduce installation time
+```
+
+Note: this is the stated reason for the `actions/cache` step in the workflow above. The section should explain what the cache actually holds — the `~/.npm` tarball cache rather than `node_modules` — because that is what makes it safe: npm verifies each cached package against the lockfile's integrity hash, so a stale cache entry is discarded rather than installed.
