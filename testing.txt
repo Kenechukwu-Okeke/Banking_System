@@ -1,0 +1,38 @@
+okay, this an update on what we are going to do next: 
+
+First of all we are going to set up our pipeline to create docker images for to be deploy on aws ecr. Then we are going to create Kubernetes manifest files for the source code to be deploy on aws eks. We are doing to be using :
+
+- **AWS EKS** – Managed Kubernetes service
+- **eksctl** – EKS cluster provisioning tool
+- **Docker** – Containerization
+- **GitHub Actions (CI pipeline)** – Build and push images
+- **Kubernetes** – Container orchestration
+- **NGINX Ingress Controller** – Traffic routing
+- **cert-manager** – Automated TLS certificates
+- **Let’s Encrypt** – SSL/TLS provider
+- **Argo CD** – GitOps continuous deployment
+- **OpenLens** – Kubernetes GUI
+- **kubectl & Helm** – Cluster management
+
+
+and then 
+- Create and manage container images using Amazon ECR
+- Provision a Kubernetes cluster using `eksctl`
+- Automate Docker build and image push using a CI pipeline
+- Deploy applications to Kubernetes using manifests
+- Expose applications securely using HTTPS with cert-manager
+- Implement GitOps-based continuous deployment with Argo CD
+
+I need you to design the setup and i a=going to be using OIDC to connect to the AWS Account. 
+
+
+
+
+use two t3.medium to save cost. 
+use one NAT gateway 
+ AWS account already has a OIDC. i want it referenced in the terraform pipeline. Then but my system already have an aws IAM user logged in so i only need it to be referenced in the repo. I will added it as a secret in the repo settings . 
+i want Terraform creates the ECR repositories (recommended)
+i will be using us-west-1
+and i willbe using Namecheap not route 53
+
+s3 bucket to use for remote 

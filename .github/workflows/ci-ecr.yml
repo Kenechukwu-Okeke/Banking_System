@@ -1,0 +1,88 @@
+name: Build and push images to ECR
+
+# Runs when work lands on main or devops. Pull request checks are covered by the
+# separate CI Pipeline workflow; this workflow needs AWS credentials, so it is
+# deliberately not wired to pull_request events.
+on:
+  push:
+    branches:
+      - main
+      - devops
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  id-token: write # exchange the GitHub OIDC token for AWS credentials
+  contents: read
+
+env:
+  AWS_REGION: us-west-1 # ← must match the region of the ECR repositories
+  ECR_BACKEND_REPO: banking-backend # ← ECR repository names
+  ECR_FRONTEND_REPO: banking-frontend
+
+jobs:
+  build-and-push:
+    name: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Assume the AWS role through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }} # ← secret, see kubernetes/README.md
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-banking-${{ github.run_id }}
+
+      - name: Compute the image tag
+        id: meta
+        run: echo "tag=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # The repositories, their immutable-tag setting and scan-on-push are
+      # managed by Terraform (terraform/infra/ecr.tf). This workflow only pushes.
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push the backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_BACKEND_REPO }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push the frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          # Empty on purpose: the browser calls the API on the same origin, and
+          # the Ingress routes /api to the backend Service.
+          build-args: |
+            REACT_APP_API_URL=
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_FRONTEND_REPO }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Record the image references
+        run: |
+          {
+            echo "### Images pushed"
+            echo
+            echo '```'
+            echo "${{ steps.ecr.outputs.registry }}/${{ env.ECR_BACKEND_REPO }}:${{ steps.meta.outputs.tag }}"
+            echo "${{ steps.ecr.outputs.registry }}/${{ env.ECR_FRONTEND_REPO }}:${{ steps.meta.outputs.tag }}"
+            echo '```'
+            echo
+            echo "Update \`kubernetes/06-backend-deployment.yaml\` and \`kubernetes/08-frontend-deployment.yaml\` in the architecture repository with tag \`${{ steps.meta.outputs.tag }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
